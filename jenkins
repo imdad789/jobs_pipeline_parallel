@@ -1,0 +1,30 @@
+pipeline{
+    agent {
+        label 'slavenode'
+    }
+    tools {
+        maven "maven"
+    }
+    stages{
+        stage('Msg'){
+            steps{
+                echo 'Welcome to our Project'
+            }
+        }
+        stage('Code Checkout'){
+            steps{
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'gitid', url: 'https://github.com/imdad789/mvn-flipkart.git']])
+            }
+        }
+        stage('Build'){
+            steps{
+                sh 'mvn clean package -f pom.xml'
+            }
+        }
+        stage('Deploy to Dev'){
+            steps{
+                deploy adapters: [tomcat9(alternativeDeploymentContext: '', credentialsId: 'tomcat', path: '', url: 'http://35.200.178.209:8090')], contextPath: 'flipkart-1.0-SNAPSHOT', war: 'target/flipkart-1.0-SNAPSHOT.war'
+            }
+        }
+    }
+}
