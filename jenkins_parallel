@@ -1,0 +1,67 @@
+pipeline{
+    agent {
+        label 'slavenode'
+    }
+    tools {
+        maven "maven"
+    }
+    stages{
+        stage('Parallel Checkout'){
+            parallel{
+                stage('Code Checkout Flipkart'){
+                    agent {label 'slavenode'}
+                    steps{
+                        checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'gitid', url: 'https://github.com/imdad789/mvn-flipkart.git']])
+                    }
+                }
+                stage('Code Checkout Amazon'){
+                    agent {label 'slavenode2'}
+                    steps{
+                        checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'gitid', url: 'https://github.com/imdad789/mvn-amazon.git']])            
+                    }
+                }    
+            }
+        }
+        stage('Build Parallel'){
+            parallel{
+                stage('flipkart_Build'){
+                    agent {label 'slavenode'}
+                    steps{
+                        sh 'mvn clean package -f pom.xml'
+                    }
+                }
+                stage('amazon_build'){
+                    agent {label 'slavenode2'}
+                    steps{
+                        sh 'mvn clean package -f pom.xml'
+                    }
+                }
+            }
+        }
+        stage('Approvals to Deployment in DEV and STAGE envs'){
+                steps{
+                        echo "Taking approval from Manager to deploy wars"
+                        timeout(time: 7, unit: 'DAYS') {
+                        input message: 'Do you want to deploy wars in stage n DEV env?', submitter: 'imdad'
+                        }
+                    }
+        }
+        stage('Deploy to Env'){
+            parallel{
+                stage('Jenkins sever Deploy'){
+                    agent {label 'slavenode'}
+                    steps{
+                        deploy adapters: [tomcat9(alternativeDeploymentContext: '', credentialsId: 'tomcat', path: '', url: 'http://34.93.31.206:8090')], contextPath: 'flipkart-1.0-SNAPSHOT', war: 'target/flipkart-1.0-SNAPSHOT.war'
+                    }
+                }
+                stage('Slavenode2 Deploy'){
+                    agent {label 'slavenode2'}
+                    steps{
+                       deploy adapters: [tomcat9(alternativeDeploymentContext: '', credentialsId: 'tomcat', path: '', url: 'http://34.47.251.180:8091')], contextPath: 'amazon-1.0-SNAPSHOT', war: 'target/amazon-1.0-SNAPSHOT.war'
+                    }
+                }
+            }
+        }
+        
+    }        
+}
